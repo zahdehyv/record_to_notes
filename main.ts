@@ -10,6 +10,15 @@ const DEFAULT_SETTINGS: MyPluginSettings = {
     googleApiKey: ''
 }
 
+function arrayBufferToBase64(aBuffer: ArrayBuffer): string {
+    const uint8Array = new Uint8Array(aBuffer); // Create a Uint8Array view of the ArrayBuffer
+    let binaryString = "";
+    for (let i = 0; i < uint8Array.length; i++) {
+        binaryString += String.fromCharCode(uint8Array[i]); // Convert each byte to a character
+    }
+    return btoa(binaryString); // Encode the binary string to Base64
+}
+
 export default class MyPlugin extends Plugin {
     settings: MyPluginSettings;
     private isRecording: boolean = false;
@@ -122,10 +131,10 @@ export default class MyPlugin extends Plugin {
             }
 
             // Save the recording file
-            console.log(`Saving file to: ${fullPath}`);
-            await this.app.vault.createBinary(fullPath, arrayBuffer);
             new Notice('Recording saved successfully!');
-            console.log('File saved successfully.');
+            (`Saving file to: ${fullPath}`);
+            await this.app.vault.createBinary(fullPath, arrayBuffer);
+            new Notice('File saved successfully.');
 
             // Wait for a short period to ensure the file is fully saved
             await new Promise(resolve => setTimeout(resolve, 1000)); // 1 second delay
@@ -135,24 +144,29 @@ export default class MyPlugin extends Plugin {
             if (!fileExists) {
                 throw new Error('File was not saved correctly.');
             }
-            console.log(`File ${fullPath} exists, proceeding with Gemini processing.`);
-
+            new Notice(`File ${fullPath} exists, proceeding with Gemini processing.`);
+            // new Notice(`fullpath ${fullPath}`)
+            // new Notice(`absolutepath ()()${absolutePath}`)
             // Process the recording with Gemini
-            await this.processRecordingWithGemini(absolutePath);
+            await this.processRecordingWithGemini(arrayBuffer);
         } catch (error) {
             new Notice('Failed to save recording. Please try again.');
             console.error('Error saving recording:', error);
         }
     }
 
-    private async processRecordingWithGemini(filePath: string) {
+    private async processRecordingWithGemini(aBuffer: ArrayBuffer) {
         if (!this.genAI || !this.fileManager) {
             new Notice('Gemini is not initialized. Please check your API key.');
             return;
         }
+        new Notice("entered Gemini processing")
+        const audioData = arrayBufferToBase64(aBuffer);
+        new Notice("created Buffer")
+
 
         try {
-            const file = await this.uploadToGemini(filePath, 'audio/webm');
+            // const file = await this.uploadToGemini(filePath, 'audio/webm');
 
             // Define the tools (functions) for Gemini
             const tools = [
@@ -237,9 +251,9 @@ Tu objetivo es ser útil, claro y eficiente en todo momento, utilizando las herr
                         role: "user",
                         parts: [
                             {
-                                fileData: {
-                                    mimeType: file.mimeType,
-                                    fileUri: file.uri,
+                                inlineData: {
+                                    data: audioData,
+                                    mimeType: "audio/mp3",
                                 },
                             },
 							{ text: `Escucha las instrucciones en el audio y actua acordemente
@@ -252,9 +266,9 @@ Puedes incluir vinculos a otros archivos usando [[filename]] en el contenido de 
             });
 
             // Send a message to the chat session
-			console.log("start sending");
+			new Notice("start sending");
             const result = await chatSession.sendMessage("INSERT_INPUT_HERE");
-			console.log("end sending");
+			new Notice("end sending");
 			console.log("RESULTADO");
             console.log(result);
             // Handle function calls in the response
@@ -326,7 +340,9 @@ Puedes incluir vinculos a otros archivos usando [[filename]] en el contenido de 
         new Notice(args.message);
         return `User notified with message: ${args.message}`;
     }
+    
 }
+
 
 class RecordingModal extends Modal {
     plugin: MyPlugin;
